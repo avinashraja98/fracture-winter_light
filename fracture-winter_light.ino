@@ -56,7 +56,7 @@ unsigned int fadingMode = 0; //start with all LED's off.
 
 unsigned long startTime = 0; // start time for the chosen fading mode
 
-struct lightInfo
+struct lightInfo // The structure that saves all light information. This includes brightness and state
 {
   unsigned int brightness;
   boolean power;
@@ -79,6 +79,7 @@ void setup()
 
   ShiftPWM.Start(pwmFrequency, maxBrightness);
 
+  // Initialize all lights to off and brightness 0
   for (int i = 0; i < numOutputs; i++)
   {
     lights[i].brightness = 0;
@@ -160,7 +161,7 @@ void loop()
     break;
   }
 
-  // Handle Lights
+  // Handle Lights, checks the structure every loop and updates the network.
   for (int i = 0; i < numOutputs; i++)
   {
     if (lights[i].power)
@@ -174,6 +175,7 @@ void loop()
   }
 }
 
+// Function to turn all lights off
 void setZero(void)
 {
   for (int i = 0; i < numOutputs; i++)
@@ -183,6 +185,7 @@ void setZero(void)
   ShiftPWM.SetAll(0);
 }
 
+// Function to turn all lights on and to the max brightness
 void setMax(void)
 {
   for (int i = 0; i < numOutputs; i++)
