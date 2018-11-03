@@ -6,8 +6,8 @@
 */
 
 // ShiftPWM uses timer1 by default. To use a different timer, before '#include <ShiftPWM.h>', add
-// #define SHIFTPWM_USE_TIMER2  // for Arduino Uno and earlier (Atmega328)
-#define SHIFTPWM_USE_TIMER3 // for Arduino Micro/Leonardo (Atmega32u4)                      //<------- Have to be set according to the hardware used (Default: TIMER2 was enabled)
+#define SHIFTPWM_USE_TIMER2  // for Arduino Uno and earlier (Atmega328)
+//#define SHIFTPWM_USE_TIMER3 // for Arduino Micro/Leonardo (Atmega32u4)                      //<------- Have to be set according to the hardware used (Default: TIMER2 was enabled)
 
 // Clock and data pins are pins from the hardware SPI, you cannot choose them yourself.
 // Data pin is MOSI (Uno and earlier: 11, Leonardo: ICSP 4, Mega: 51, Teensy 2.0: 2, Teensy 2.0++: 22)
@@ -16,10 +16,10 @@
 // You can choose the latch pin yourself.
 const int ShiftPWM_latchPin = 8;
 
-// ** uncomment this part to NOT use the SPI port and change the pin numbers. This is 2.5x slower **     //<------- I uncommented these three lines to make it work with the particular shift register I had. Can be commented to use max speed. (Default: Was commented) 
-#define SHIFTPWM_NOSPI
-const int ShiftPWM_dataPin = 5;
-const int ShiftPWM_clockPin = 6;
+// ** uncomment this part to NOT use the SPI port and change the pin numbers. This is 2.5x slower **     //<------- I uncommented these three lines to make it work with the particular shift register I had. Can be commented to use max speed. (Default: Was commented)
+//#define SHIFTPWM_NOSPI
+//const int ShiftPWM_dataPin = 5;
+//const int ShiftPWM_clockPin = 6;
 
 // If your LED's turn on if the pin is low, set this to true, otherwise set it to false.
 const bool ShiftPWM_invertOutputs = false;
@@ -50,13 +50,14 @@ void printStatus(void);
 // These values affect the load of ShiftPWM.
 // Choose them wisely and use the PrintInterruptLoad() function to verify your load.
 unsigned char maxBrightness = 255;
-unsigned char pwmFrequency = 55;               //<------- Reduce this number to prevent timing issues and random crashes. Uses less CPU when reduced. (Default: 75)
-unsigned const int numRegisters = 3;           //<------- Set the number of shift registers used
+unsigned char pwmFrequency = 75;               //<------- Reduce this number to prevent timing issues and random crashes. Uses less CPU when reduced. (Default: 75)
+unsigned const int numRegisters = 4;           //<------- Set the number of shift registers used
 unsigned const int numOutputs = numRegisters * 8;
 unsigned int numRGBLeds = numRegisters * 8 / 3;
 unsigned int fadingMode = 0; //start with all LED's off.
 
 unsigned long startTime = 0; // start time for the chosen fading mode
+int ledCount = 1;
 
 struct lightInfo // The structure that saves brightness information of the lights.
 {
@@ -211,6 +212,7 @@ void setZero(void)
     lights[i].brightness = 0;
   }
   ShiftPWM.SetAll(0);
+  ledCount = 1;
 }
 
 // Function to turn all lights on and to the max brightness
@@ -218,35 +220,74 @@ void setMax(void)
 {
   for (int i = 0; i < numOutputs; i++)
   {
-    lights[i].brightness = 255;
+    lights[i].brightness = 3;
   }
-  ShiftPWM.SetAll(255);
+  ShiftPWM.SetAll(3);
 }
+
+int percent = 40;
+int prevBri = 0;
 
 void fadeInOneByOne(void)
-{ // Fade in all outputs one at a time
+{ // Fade in all outputs
   unsigned char brightness;
-  unsigned long fadeTime = 500;                     // Time taken to fade a single output
+
+  for (int k = 0; k < (maxBrightness*(percent/100)*(numOutputs))+1000; k++)
+  {
+    delay(10);
+    brightness = k;
+    if (brightness % (int)(maxBrightness * percent * 0.01) >= (int)(maxBrightness * percent * 0.01) - 1 && prevBri != (brightness % (int)(maxBrightness * percent * 0.01)) && ledCount < numOutputs)
+    {
+      ledCount++;
+    }
+    prevBri = brightness % (int)(maxBrightness * percent * 0.01);
+    for (int i = 0; i < ledCount; i++)
+    {
+      int instBright = (brightness)-((int)((maxBrightness*percent*0.01)-1)*i);
+      if (instBright <= maxBrightness)
+        lights[i].brightness = instBright;
+      else
+        lights[i].brightness = maxBrightness;
+
+      //Serial.print(brightness - ((int)((maxBrightness * percent * 0.01) - 1)*i)); Serial.print(" ");
+    }
+  }
+  ledCount = 1;
+  prevBri = 0;
+  fadingMode = 1;
+}
+/*
+  void fadeInOneByOne(void)
+  { // Fade in all outputs one at a time
+  //delay(50);
+  unsigned char brightness;
+  unsigned long fadeTime = 10000;                     // Time taken to fade a single output
   unsigned long loopTime = numOutputs * fadeTime ;  // Total time taken for the loop to complete
   unsigned long time = millis() - startTime;        // Calculates time from command issue to current time.
-  unsigned long timer = time % loopTime;            // Calculates the number of steps remaining till loop completion
-  unsigned long currentStep = timer % (fadeTime);   // Calculates the current step of the current fade sequence
+  unsigned long timer = time % loopTime;
 
-  int activeLED = timer / (fadeTime);               // From timer which tracks progress till loop completion, and the number of times fadeTime has passed, active led can be found.
-
-  if (currentStep <= fadeTime)                      // Make sure currentStep is in range
+  for(int i=0;i<numOutputs;i++)
   {
-    brightness = currentStep * maxBrightness / fadeTime; ///fading in
+    unsigned long bright = (timer * 255 / ((loopTime/numOutputs)*(i+1)));
+    if(bright<=255)
+    {
+      lights[i].brightness = bright;
+      //Serial.print(bright);Serial.print(" ");
+    }
+    else
+    {
+      lights[i].brightness = 255;
+      //Serial.print("255 ");
+    }
   }
-  else
-  {
-    brightness = maxBrightness;// - (currentStep - fadeTime) * maxBrightness / fadeTime; ///fading out;
-  }
-
+  //Serial.println();
+  //printStatus();
+  /*
   if (lights[activeLED].brightness < maxBrightness - 1) // Used to prevent making a fully bright led go to 0 and then increase again to max when the loop starts again
     lights[activeLED].brightness = brightness;
-}
 
+  }
+*/
 void fadeInOneByOne(int list[])
 { // Fade in all outputs one at a time. Same as previous but takes in the custom list and follows that order.
   unsigned char brightness;
@@ -394,4 +435,3 @@ void printStatus(void)
   }
   Serial.println();
 }
-
