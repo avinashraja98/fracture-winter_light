@@ -41,7 +41,7 @@ const bool ShiftPWM_balanceLoad = false;
 
 unsigned char maxBrightness = 255;
 unsigned char pwmFrequency = 75;
-unsigned const int numRegisters = 1;
+unsigned const int numRegisters = 2;
 unsigned const int numOutputs = numRegisters * 8;
 
 int ledCount = 1;
@@ -52,6 +52,7 @@ struct lightInfo // The structure that saves brightness information of the light
 } lights[numOutputs];
 
 int customList[] = {4, 2, 3, 5, 8, 6, 1, 7}; // This list is set to control the order in which the lights will light up. (Conditions: should be in the range of the outputs, ie if the number of shift registers are 3, the list should contain numbers between [1,24] inclding the edges)
+int customListSize =  8;
 
 // Variables to control random light selection
 int randomList[numOutputs];
@@ -96,7 +97,7 @@ void loop()
 
   // Fade in and fade out all outputs one by one fast. Usefull for testing your hardware. Use OneByOneSlow when this is going to fast.
   //ShiftPWM.OneByOneFast();
-
+/*
   delay(1000);
 
   setMax();
@@ -121,27 +122,64 @@ void loop()
   printStatus();
 
   delay(1000);  
+*/
+  //fadeInOneByOne(customList, customListSize);
+  Serial.println("Setmax");
+  setMax();
+  printStatus();
+  
+  delay(1000);
 
-  fadeInOneByOne(customList);
+  Serial.println("Outfade");
+  fadeOutOneByOne(customList, customListSize);
   printStatus();
 
   delay(1000);
 
-  fadeOutOneByOne(customList);
+  Serial.println("Snapin");
+  snapIn(customList, customListSize);
   printStatus();
 
   delay(1000);
 
-  fadeInOneByOne(randomList);
+  Serial.println("Snapout");
+  snapOut(customList, customListSize);
   printStatus();
 
   delay(1000);
 
-  fadeOutOneByOne(randomList);
-  printStatus();
+  //fadeInOneByOne(randomList);
+  //printStatus();
+
+  //delay(1000);
+
+  //fadeOutOneByOne(randomList);
+  //printStatus();
 
   delay(1000);  
   
+}
+
+void snapIn(int list[], int listSize)
+{
+  for(int i=0;i<listSize;i++)
+  {
+    lights[list[i]-1].brightness = maxBrightness;
+    ShiftPWM.SetOne(list[i]-1, maxBrightness);
+
+    delay(250); // Time between next snap
+  }
+}
+
+void snapOut(int list[], int listSize)
+{
+  for(int i=listSize-1;i>=0;i--)
+  {
+    lights[list[i]-1].brightness = 0;
+    ShiftPWM.SetOne(list[i]-1, 0);
+
+    delay(250); // Time between next snap
+  }
 }
 
 void inOutAll(void)
@@ -221,7 +259,7 @@ void fadeInOneByOne(void)
   setMax();
 }
 
-void fadeInOneByOne(int list[])
+void fadeInOneByOne(int list[], int listSize)
 { // Fade in all outputs
 
   for (int k = 0; k < (maxBrightness * ((double)percent / 100) * (numOutputs)) + 1000; k++)
@@ -235,6 +273,11 @@ void fadeInOneByOne(int list[])
     prevBri = brightness % (int)(maxBrightness * percent * 0.01);
     for (int i = 0; i < ledCount; i++)
     {
+      if( i >= listSize )
+      {       
+        Serial.print("Processed ");Serial.print(i);Serial.println(" LEDs in the list!"); 
+        return;
+      }
       int instBright = (brightness) - ((int)((maxBrightness * percent * 0.01) - 1) * i);
       if (instBright <= maxBrightness)
       {
@@ -276,30 +319,30 @@ void fadeOutOneByOne(void)
       {
         //lights[i].brightness = maxBrightness;
         ShiftPWM.SetOne(i, lights[i].brightness);
-        Serial.print(lights[i].brightness);        
+        //Serial.print(lights[i].brightness);        
       }      
       else if (instBright <= maxBrightness)
       {
         lights[i].brightness = maxBrightness - instBright;
         ShiftPWM.SetOne(i, lights[i].brightness);
-        Serial.print(maxBrightness - instBright);
+        //Serial.print(maxBrightness - instBright);
       }
       else
       {
         lights[i].brightness = 0;
         ShiftPWM.SetOne(i, lights[i].brightness);
-        Serial.print("0");
+        //Serial.print("0");
       }
-      Serial.print(" ");
+      //Serial.print(" ");
     }
-    Serial.println(ledCount);
+    //Serial.println(ledCount);
   }
   ledCount = 1;
   prevBri = 0;
   setZero();
 }
 
-void fadeOutOneByOne(int list[])
+void fadeOutOneByOne(int list[], int listSize)
 { // Fade in all outputs
 
   for (int k = 0; k < (maxBrightness * ((double)percent / 100) * (numOutputs)) + 1000; k++)
@@ -313,28 +356,34 @@ void fadeOutOneByOne(int list[])
     prevBri = brightness % (int)(maxBrightness * percent * 0.01);
     for (int i = ledCount-1; i >= 0; i--)
     {
+      if( i >= listSize )
+      {       
+        Serial.print("Processed ");Serial.print(i);Serial.println(" LEDs in the list!"); 
+        return;
+      }
+      
       int instBright = (brightness) - ((int)((maxBrightness * percent * 0.01) - 1) * i);
       if(instBright < 0)
       {
         //lights[i].brightness = maxBrightness;
         ShiftPWM.SetOne(list[i] - 1, lights[list[i] - 1].brightness);
-        Serial.print(lights[list[i] - 1].brightness);        
+        //Serial.print(lights[list[i] - 1].brightness);        
       }      
       else if (instBright <= maxBrightness)
       {
         lights[list[i] - 1].brightness = maxBrightness - instBright;
         ShiftPWM.SetOne(list[i] - 1, lights[list[i] - 1].brightness);
-        Serial.print(maxBrightness - instBright);
+        //Serial.print(maxBrightness - instBright);
       }
       else
       {
-        lights[list[i]].brightness = 0;
+        lights[list[i]-1].brightness = 0;
         ShiftPWM.SetOne(list[i] - 1, lights[list[i] - 1].brightness);
-        Serial.print("0");
+        //Serial.print("0");
       }
-      Serial.print(" ");
+      //Serial.print(" ");
     }
-    Serial.println(ledCount);
+    //Serial.println(ledCount);
   }
   ledCount = 1;
   prevBri = 0;
