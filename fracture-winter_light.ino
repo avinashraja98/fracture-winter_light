@@ -220,9 +220,9 @@ void setMax(void)
 {
   for (int i = 0; i < numOutputs; i++)
   {
-    lights[i].brightness = 3;
+    lights[i].brightness = maxBrightness;
   }
-  ShiftPWM.SetAll(3);
+  ShiftPWM.SetAll(maxBrightness);
 }
 
 int percent = 40;
@@ -230,12 +230,11 @@ int prevBri = 0;
 
 void fadeInOneByOne(void)
 { // Fade in all outputs
-  unsigned char brightness;
-
-  for (int k = 0; k < (maxBrightness*(percent/100)*(numOutputs))+1000; k++)
+  
+  for (int k = 0; k < (maxBrightness*((double)percent/100)*(numOutputs))+1000; k++)
   {
-    delay(10);
-    brightness = k;
+    delay(5);
+    unsigned long brightness = k;
     if (brightness % (int)(maxBrightness * percent * 0.01) >= (int)(maxBrightness * percent * 0.01) - 1 && prevBri != (brightness % (int)(maxBrightness * percent * 0.01)) && ledCount < numOutputs)
     {
       ledCount++;
@@ -245,17 +244,26 @@ void fadeInOneByOne(void)
     {
       int instBright = (brightness)-((int)((maxBrightness*percent*0.01)-1)*i);
       if (instBright <= maxBrightness)
+      {
         lights[i].brightness = instBright;
+        ShiftPWM.SetOne(i, lights[i].brightness);
+        //Serial.print(instBright);
+      }
       else
+      {
         lights[i].brightness = maxBrightness;
-
-      //Serial.print(brightness - ((int)((maxBrightness * percent * 0.01) - 1)*i)); Serial.print(" ");
+        ShiftPWM.SetOne(i, lights[i].brightness);
+        //Serial.print("255");
+      }
+      //Serial.print(" ");
     }
+    //Serial.print(k);Serial.println(ledCount);
   }
   ledCount = 1;
   prevBri = 0;
   fadingMode = 1;
 }
+
 /*
   void fadeInOneByOne(void)
   { // Fade in all outputs one at a time
